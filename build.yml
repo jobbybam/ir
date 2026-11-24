@@ -1,0 +1,43 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack project
+        run: unzip -q irremote-project.zip -d src
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Download IR database (Flipper-IRDB, CC0)
+        run: git clone --depth 1 https://github.com/UberGuidoZ/Flipper-IRDB irdb
+
+      - name: Convert database for the app
+        run: |
+          A=src/irremote/app/src/main/assets
+          mkdir -p $A
+          python3 src/irremote/tools/ir_convert.py irdb -o $A/irdb.sqlite --power-json $A/power_codes.json --power-types TVs Projectors Monitors Whiteboards Touchscreen_Displays Digital_Signs
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        working-directory: src/irremote
+        run: gradle assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ir-remote-apk
+          path: src/irremote/app/build/outputs/apk/debug/app-debug.apk
